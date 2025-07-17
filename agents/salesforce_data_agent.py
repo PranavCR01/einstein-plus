@@ -102,14 +102,18 @@ tools = [
     )
 ]
 
-llm = ChatOllama(model="mistral")
+def create_sf_agent():
+    """Create and return the LangChain Salesforce agent."""
+    llm = ChatOllama(model="mistral")
+    return initialize_agent(
+        tools=tools,
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=True,
+        handle_parsing_errors=True,
+        return_intermediate_steps=False,
+    )
 
-sf_agent = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True,
-    handle_parsing_errors=True,
-    return_intermediate_steps=False
-)
+
+sf_agent = create_sf_agent()
 
