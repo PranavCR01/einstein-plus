@@ -20,22 +20,37 @@ def redact_sensitive_fields(record: dict) -> dict:
         for k, v in record.items()
     }
 
+
+def clean_part(value: str) -> str:
+    """Strip quotes/backticks and surrounding whitespace from a value."""
+    return value.strip(" `\"'")
+
 def query_salesforce_from_prompt(prompt: str) -> str:
     global last_query_results
 
-    clean_input = prompt.strip("`").strip('"').strip("'")
+    clean_input = prompt.strip("`\"'")
 
     try:
-        parts = {
-            k.strip(): clean_part(v)
-            for part in clean_input.split("|")
-            for k, v in [part.split(":", 1)]
-        }
-        object_name = parts.get("object", "Case")
-        where_clause = parts.get("where", "Status != 'Closed'")
-        fields = parts.get("fields", "FIELDS(ALL)")
-    except Exception as e:
-        return f"❌ Error parsing input. Format: `object: ObjectName | where: condition | fields: field1, field2`. Error: {str(e)}"
+        parts = {}
+        for segment in clean_input.split("|"):
+            if ":" in segment:
+                key, value = segment.split(":", 1)
+                parts[key.strip()] = clean_part(value)
+        object_name = parts.get("object")
+        where_clause = parts.get("where")
+        fields = parts.get("fields")
+    except Exception:
+        return (
+            "❌ Error parsing input segments. Expected format: `object: ObjectName | where: condition | fields: field1, field2`"
+        )
+
+    if not object_name or not where_clause:
+        extracted = extract_soql_components(prompt)
+        object_name = object_name or extracted.get("object_name", "Case")
+        where_clause = where_clause or extracted.get("where_clause", "Status != 'Closed'")
+        fields = fields or extracted.get("fields")
+
+    fields = fields or "FIELDS(ALL)"
 
     # Only try resolving subquery if 'IN (SELECT' is explicitly present
     if re.search(r'IN\s*\(\s*SELECT\s+', where_clause, re.IGNORECASE):
